@@ -51,6 +51,15 @@ public class ParsingTableModel extends AbstractTableModel {
     public String getColumnName(int columnIndex) {
         return colunas[columnIndex];
     }
+    
+    public int getColumnIndex(Object token) {
+        for (int i = 0; i < colunas.length; i++) {
+            if(colunas[i].equals(token)){
+                return i;
+            }
+        }
+        return -1;
+    }
 
     @Override
     public Object getValueAt(int rowIndex, int columnIndex) {
