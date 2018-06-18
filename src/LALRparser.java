@@ -14,12 +14,14 @@ import java.util.StringTokenizer;
  *
  * @author diego
  */
-public class SLRTable {
+public class LALRparser {
 
     private static boolean expressaoValida = true, leuCompletamente = false;
+    private static ParsingTableModel model;
+    private static List<Gramatica> gramatica = new ArrayList<>();
     public static Stack<String> pilhaParsing  = new Stack<String>();
     public static Stack<String> entradaPilha  = new Stack<String>();
-    public static List<String> entradaParsing = new ArrayList<>();
+    public static Stack<String> entradaParsing = new Stack<String>();
     
     public static String[][] table = new String[][] {
        // 01  02   03  04  05  06  07  08  09   10 11 12 13 14 15 16 17
@@ -50,6 +52,22 @@ public class SLRTable {
         {"","","","r5","","","","","","","r5","","","","","","",""}
     };
     
+    public LALRparser(){
+        gramatica.add(new Gramatica(0, "S'", "S"));
+        gramatica.add(new Gramatica(1, "S", "E ; A"));
+        gramatica.add(new Gramatica(2, "S", "A"));
+        gramatica.add(new Gramatica(3, "A", "I"));
+        gramatica.add(new Gramatica(4, "A", "E"));
+        gramatica.add(new Gramatica(5, "I", "if E then S else S"));
+        gramatica.add(new Gramatica(6, "E", "E + T"));
+        gramatica.add(new Gramatica(7, "E", "F"));
+        gramatica.add(new Gramatica(8, "E", "( E )"));
+        gramatica.add(new Gramatica(9, "T", "T * F"));
+        gramatica.add(new Gramatica(10, "T", "F"));
+        gramatica.add(new Gramatica(11, "F", "0"));
+        gramatica.add(new Gramatica(12, "F", "1"));
+    }
+    
     public boolean verificaNumero(String entrada) throws RuntimeException{
         try {
             int i = Integer.parseInt(entrada);
@@ -61,6 +79,7 @@ public class SLRTable {
         }
         return true;
     }
+    
     public boolean verificaOperador(String operador){
         if(operador.equals(";"))
             return true;
@@ -83,6 +102,7 @@ public class SLRTable {
         else
             return false;
     }
+    
     public String getTokenOperador(String entrada) throws RuntimeException{
         
            if(verificaOperador(entrada)){
@@ -96,12 +116,13 @@ public class SLRTable {
         try{
             Stack<String> tempStack = new Stack<>();
             StringTokenizer st = new StringTokenizer(entrada, " ");
+            entradaPilha.push("$");
             while(st.hasMoreTokens()){
                 String token = st.nextToken();
                 if(verificaNumero(token)){
                     tempStack.push(token);
                 }else{
-                     System.out.println("Operador: " + getTokenOperador(token));
+                     //System.out.println("Operador: " + getTokenOperador(token));
                      tempStack.push(token);
                 }
             }
@@ -116,41 +137,85 @@ public class SLRTable {
        
     }   
     
-    public void fazerParsing(ParsingTableModel object){
-        ParsingTableModel model = object;
+    public String fazerParsing(ParsingTableModel object){
+        model = object;
         
         // Obtem o indice da coluna pelo token de entrada
         int coluna = model.getColumnIndex(entradaPilha.peek());
         String operacao = (String) model.getValueAt(Integer.parseInt(pilhaParsing.peek()), coluna);
-        System.out.println("Operacao: " + operacao);
-        checaOperacao(operacao);
+        return checaOperacao(operacao);
     }
     
-    private void checaOperacao(String operacao){
-        if(verificaNumero(operacao)){
-            //Go to
-        }else{
+    private String checaOperacao(String operacao){
+        
+        if(!operacao.isEmpty()){
             if(operacao.charAt(0) == 's'){
                 //Shift
                 String replace = operacao.replace("s", "");
-                operacaoShift(Integer.parseInt(replace));
+                return operacaoShift(Integer.parseInt(replace));
             }else{
-                //Reduce
-                String replace = operacao.replace("r", "");
-            }
-        }
-    }
-    
-    private void operacaoShift(int shift){
-        pilhaParsing.add(String.valueOf(shift));
-        entradaParsing.add(entradaPilha.pop());
-    }
-    
-    private void operacaoReduce(int reduce){
+                if(operacao.charAt(0) == 'r'){
+                    //Reduce
+                    String replace = operacao.replace("r", "");
+                    return operacaoReduce(Integer.parseInt(replace));
+                }else{
+                    // aceita a string
+                    if(operacao.equals("acc")){
+                        return "Aceito!";   
+                    }  
+                }    
+            }            
+        }else{
+            throw new RuntimeException("Não é possivel fazer o parsing!");    
+        }        
+        
+        return "Erro";
         
     }
     
+    private String operacaoShift(int shift){
+        pilhaParsing.add(String.valueOf(shift));
+        entradaParsing.add(entradaPilha.pop());
+        System.out.println("Shift para: s" + shift);
+        return "Analisando";
+    }
+    
+    private String operacaoReduce(int reduce){
+        System.out.println("Reduz para r" + reduce + ", Entrada: " + entradaPilha.peek() + " com " + pilhaParsing.peek());
+        for (int i = 0; i < gramatica.get(reduce).getTamanhoProducaoDireita(); i++) {
+            pilhaParsing.pop();
+            entradaParsing.pop();
+        }
+        int coluna = model.getColumnIndex(gramatica.get(reduce).getProducaoEsquerda());
+        String desvio = (String) model.getValueAt(Integer.parseInt(pilhaParsing.peek()), coluna);
+        System.out.println("Desvio de " + pilhaParsing.peek() + " com " + gramatica.get(reduce).getProducaoEsquerda() + " para: " + desvio);
+        entradaParsing.push(gramatica.get(reduce).getProducaoEsquerda());
+        pilhaParsing.push(desvio);
+        return "Analisando";
+    }
+    
     public class Gramatica{
-        Char 
+        int numProd;
+        String producaoEsquerda;
+        List<String> producaoDireita = new ArrayList<>();
+        
+        public Gramatica(int numProd, String prodEsquerda, String prodDireita){
+            this.numProd = numProd;
+            this.producaoEsquerda = prodEsquerda;
+            StringTokenizer st = new StringTokenizer(prodDireita," ");
+            while(st.hasMoreTokens()){
+                this.producaoDireita.add(st.nextToken());
+            }
+        }
+        
+        public int getNumProd(){
+            return numProd;
+        }
+        public String getProducaoEsquerda(){
+            return producaoEsquerda;
+        }
+        public int getTamanhoProducaoDireita(){
+           return producaoDireita.size();
+        }
     }
 }
